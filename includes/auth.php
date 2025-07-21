@@ -23,7 +23,7 @@ function requireRole($allowedRoles) {
 function login($email, $password) {
     global $db;
     
-    $query = "SELECT id, name, email, password, role, status, branch_id FROM users WHERE email = ? AND status = 'active'";
+    $query = "SELECT id, name, email, password, role, status FROM users WHERE email = ? AND status = 'active'";
     $stmt = $db->prepare($query);
     $stmt->execute([$email]);
     
@@ -33,7 +33,6 @@ function login($email, $password) {
             $_SESSION['user_name'] = $user['name'];
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_role'] = $user['role'];
-            $_SESSION['user_branch_id'] = $user['branch_id'];
             $_SESSION['login_time'] = time();
             
             // Update last login
@@ -62,29 +61,7 @@ function getCurrentUser() {
         'id' => $_SESSION['user_id'],
         'name' => $_SESSION['user_name'],
         'email' => $_SESSION['user_email'],
-        'role' => $_SESSION['user_role'],
-        'branch_id' => $_SESSION['user_branch_id'] ?? null
+        'role' => $_SESSION['user_role']
     ];
-}
-
-function registerUser($name, $email, $password, $phone = null, $address = null) {
-    global $db;
-    
-    // Check if email already exists
-    $checkQuery = "SELECT id FROM users WHERE email = ?";
-    $checkStmt = $db->prepare($checkQuery);
-    $checkStmt->execute([$email]);
-    
-    if ($checkStmt->fetch()) {
-        return false; // Email already exists
-    }
-    
-    $hashedPassword = password_hash($password, HASH_ALGO);
-    
-    $query = "INSERT INTO users (name, email, password, role, phone, address, status, created_at) 
-              VALUES (?, ?, ?, 'customer', ?, ?, 'active', NOW())";
-    $stmt = $db->prepare($query);
-    
-    return $stmt->execute([$name, $email, $hashedPassword, $phone, $address]);
 }
 ?>

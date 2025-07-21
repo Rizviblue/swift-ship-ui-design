@@ -29,7 +29,7 @@ $(document).ready(function() {
     });
 
     // Confirm delete actions
-    $('.btn-danger, .text-danger, a[href*="delete"]').on('click', function(e) {
+    $('.btn-danger, .text-danger').on('click', function(e) {
         if ($(this).attr('href') && $(this).attr('href').includes('delete')) {
             if (!confirm('Are you sure you want to delete this item?')) {
                 e.preventDefault();
@@ -96,65 +96,6 @@ $(document).ready(function() {
 
     // Check for notifications every minute
     setInterval(checkNotifications, 60000);
-
-    // DataTables initialization for large tables
-    if ($('.data-table').length) {
-        $('.data-table').DataTable({
-            responsive: true,
-            pageLength: 25,
-            order: [[0, 'desc']],
-            language: {
-                search: "Search records:",
-                lengthMenu: "Show _MENU_ records per page",
-                info: "Showing _START_ to _END_ of _TOTAL_ records",
-                paginate: {
-                    first: "First",
-                    last: "Last",
-                    next: "Next",
-                    previous: "Previous"
-                }
-            }
-        });
-    }
-
-    // Auto-complete for tracking numbers
-    $('#tracking_number').on('input', function() {
-        var value = $(this).val();
-        if (value.length >= 3) {
-            // AJAX call to get suggestions
-            // Implementation would depend on backend API
-        }
-    });
-
-    // Status update confirmation
-    $('.status-update').on('change', function() {
-        var newStatus = $(this).val();
-        var trackingNumber = $(this).data('tracking');
-        
-        if (confirm('Are you sure you want to update the status to "' + newStatus + '" for tracking number ' + trackingNumber + '?')) {
-            // Submit the form or make AJAX call
-            $(this).closest('form').submit();
-        } else {
-            // Reset to previous value
-            $(this).val($(this).data('previous-value'));
-        }
-    });
-
-    // Dynamic form validation
-    $('.required-field').on('blur', function() {
-        if ($(this).val() === '') {
-            $(this).addClass('is-invalid');
-        } else {
-            $(this).removeClass('is-invalid').addClass('is-valid');
-        }
-    });
-
-    // Phone number formatting
-    $('input[type="tel"]').on('input', function() {
-        var value = $(this).val().replace(/\D/g, '');
-        var formattedValue = value.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
-        $(this).val(formattedValue);
-    });
 });
 
 // Utility Functions
@@ -165,9 +106,8 @@ function tableToCSV(table) {
     for (var i = 0; i < rows.length; i++) {
         var row = [], cols = $(rows[i]).find('td, th');
         
-        for (var j = 0; j < cols.length - 1; j++) { // Exclude last column (actions)
-            var cellText = $(cols[j]).text().trim();
-            row.push('"' + cellText.replace(/"/g, '""') + '"');
+        for (var j = 0; j < cols.length; j++) {
+            row.push('"' + $(cols[j]).text().trim() + '"');
         }
         
         csv.push(row.join(','));
@@ -248,60 +188,4 @@ function makeAjaxRequest(url, method, data, successCallback, errorCallback) {
             else showToast('An error occurred: ' + error, 'danger');
         }
     });
-}
-
-// Real-time status updates
-function updateCourierStatus(courierId, newStatus, notes = '') {
-    makeAjaxRequest(
-        'ajax/update-status.php',
-        'POST',
-        {
-            courier_id: courierId,
-            status: newStatus,
-            notes: notes
-        },
-        function(response) {
-            if (response.success) {
-                showToast('Status updated successfully!', 'success');
-                location.reload();
-            } else {
-                showToast('Error updating status: ' + response.message, 'danger');
-            }
-        }
-    );
-}
-
-// Print courier details
-function printCourierDetails(courierId) {
-    var printWindow = window.open('print-courier.php?id=' + courierId, '_blank');
-    printWindow.onload = function() {
-        printWindow.print();
-    };
-}
-
-// Bulk actions
-function bulkAction(action, selectedIds) {
-    if (selectedIds.length === 0) {
-        showToast('Please select at least one item.', 'warning');
-        return;
-    }
-    
-    if (confirm('Are you sure you want to ' + action + ' ' + selectedIds.length + ' item(s)?')) {
-        makeAjaxRequest(
-            'ajax/bulk-action.php',
-            'POST',
-            {
-                action: action,
-                ids: selectedIds
-            },
-            function(response) {
-                if (response.success) {
-                    showToast(response.message, 'success');
-                    location.reload();
-                } else {
-                    showToast('Error: ' + response.message, 'danger');
-                }
-            }
-        );
-    }
 }
