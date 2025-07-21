@@ -27,4 +27,7 @@ define('STATUS_PICKED_UP', 'picked-up');
 define('STATUS_IN_TRANSIT', 'in-transit');
 define('STATUS_DELIVERED', 'delivered');
 define('STATUS_CANCELLED', 'cancelled');
+
+// Timezone
+date_default_timezone_set('America/New_York');
 ?>

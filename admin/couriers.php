@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config/config.php';
+require_once '../config/database.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 
@@ -8,7 +9,35 @@ requireRole(['admin']);
 
 $pageTitle = 'Courier Management';
 
-// Pagination
+// Handle delete action
+if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
+    $courierId = intval($_GET['delete']);
+    
+    try {
+        global $db;
+        $db->beginTransaction();
+        
+        // Delete status history first
+        $deleteHistoryQuery = "DELETE FROM courier_status_history WHERE courier_id = ?";
+        $stmt = $db->prepare($deleteHistoryQuery);
+        $stmt->execute([$courierId]);
+        
+        // Delete courier
+        $deleteCourierQuery = "DELETE FROM couriers WHERE id = ?";
+        $stmt = $db->prepare($deleteCourierQuery);
+        $stmt->execute([$courierId]);
+        
+        $db->commit();
+        showAlert('Courier deleted successfully!', 'success');
+    } catch (Exception $e) {
+        $db->rollBack();
+        showAlert('Error deleting courier: ' . $e->getMessage(), 'danger');
+    }
+    
+    redirect('couriers.php');
+}
+
+// Pagination and filtering
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $search = isset($_GET['search']) ? sanitizeInput($_GET['search']) : '';
 $statusFilter = isset($_GET['status']) ? sanitizeInput($_GET['status']) : '';
@@ -22,35 +51,38 @@ $whereConditions = [];
 $params = [];
 
 if (!empty($search)) {
-    $whereConditions[] = "(tracking_number LIKE ? OR sender_name LIKE ? OR receiver_name LIKE ?)";
+    $whereConditions[] = "(c.tracking_number LIKE ? OR c.sender_name LIKE ? OR c.receiver_name LIKE ? OR c.receiver_city LIKE ?)";
+    $params[] = "%$search%";
     $params[] = "%$search%";
     $params[] = "%$search%";
     $params[] = "%$search%";
 }
 
 if (!empty($statusFilter)) {
-    $whereConditions[] = "status = ?";
+    $whereConditions[] = "c.status = ?";
     $params[] = $statusFilter;
 }
 
 $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
 
 // Get total count
-$countQuery = "SELECT COUNT(*) as total FROM couriers $whereClause";
+$countQuery = "SELECT COUNT(*) as total FROM couriers c $whereClause";
 $countStmt = $db->prepare($countQuery);
 $countStmt->execute($params);
-$totalRecords = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+$totalRecords = $countStmt->fetch()['total'];
 
 // Get couriers
-$query = "SELECT c.*, u.name as created_by_name 
+$query = "SELECT c.*, u.name as created_by_name, a.name as agent_name, b.name as branch_name
           FROM couriers c 
           LEFT JOIN users u ON c.created_by = u.id 
+          LEFT JOIN users a ON c.assigned_agent = a.id
+          LEFT JOIN branches b ON c.branch_id = b.id
           $whereClause 
           ORDER BY c.created_at DESC 
           LIMIT $recordsPerPage OFFSET $offset";
 $stmt = $db->prepare($query);
 $stmt->execute($params);
-$couriers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$couriers = $stmt->fetchAll();
 
 $pagination = paginate($totalRecords, $page, $recordsPerPage);
 
@@ -73,7 +105,7 @@ include '../includes/header.php';
                     <div class="col-md-4">
                         <label for="search" class="form-label">Search</label>
                         <input type="text" class="form-control" id="search" name="search" 
-                               placeholder="Search by tracking number, sender, or receiver" 
+                               placeholder="Search by tracking number, sender, receiver, or city" 
                                value="<?php echo htmlspecialchars($search); ?>">
                     </div>
                     <div class="col-md-3">
@@ -101,6 +133,9 @@ include '../includes/header.php';
                             <a href="add-courier.php" class="btn btn-success">
                                 <i class="bi bi-plus-circle"></i> Add Courier
                             </a>
+                            <a href="?export=csv<?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($statusFilter) ? '&status=' . urlencode($statusFilter) : ''; ?>" class="btn btn-outline-primary">
+                                <i class="bi bi-download"></i> Export
+                            </a>
                         </div>
                     </div>
                 </form>
@@ -122,6 +157,7 @@ include '../includes/header.php';
                                 <th>Receiver</th>
                                 <th>Destination</th>
                                 <th>Status</th>
+                                <th>Agent</th>
                                 <th>Date</th>
                                 <th>Actions</th>
                             </tr>
@@ -134,6 +170,7 @@ include '../includes/header.php';
                                 <td><?php echo $courier['receiver_name']; ?></td>
                                 <td><?php echo $courier['receiver_city']; ?></td>
                                 <td><?php echo getStatusBadge($courier['status']); ?></td>
+                                <td><?php echo $courier['agent_name'] ?? 'Unassigned'; ?></td>
                                 <td><?php echo formatDate($courier['created_at'], 'M d, Y'); ?></td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
@@ -145,7 +182,7 @@ include '../includes/header.php';
                                            class="btn btn-outline-secondary" title="Edit">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <a href="delete-courier.php?id=<?php echo $courier['id']; ?>" 
+                                        <a href="?delete=<?php echo $courier['id']; ?>" 
                                            class="btn btn-outline-danger" title="Delete"
                                            onclick="return confirm('Are you sure you want to delete this courier?')">
                                             <i class="bi bi-trash"></i>
@@ -187,4 +224,36 @@ include '../includes/header.php';
     </div>
 </div>
 
-<?php include '../includes/footer.php'; ?>
+<?php
+// Handle CSV export
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    $exportQuery = "SELECT c.tracking_number, c.sender_name, c.receiver_name, c.receiver_city, 
+                    c.status, c.delivery_fee, c.created_at, a.name as agent_name
+                    FROM couriers c 
+                    LEFT JOIN users a ON c.assigned_agent = a.id
+                    $whereClause 
+                    ORDER BY c.created_at DESC";
+    $exportStmt = $db->prepare($exportQuery);
+    $exportStmt->execute($params);
+    $exportData = $exportStmt->fetchAll();
+    
+    $csvData = [];
+    foreach ($exportData as $row) {
+        $csvData[] = [
+            $row['tracking_number'],
+            $row['sender_name'],
+            $row['receiver_name'],
+            $row['receiver_city'],
+            $row['status'],
+            $row['agent_name'] ?? 'Unassigned',
+            $row['delivery_fee'],
+            formatDate($row['created_at'], 'Y-m-d H:i:s')
+        ];
+    }
+    
+    $headers = ['Tracking Number', 'Sender', 'Receiver', 'City', 'Status', 'Agent', 'Fee', 'Date'];
+    exportToCSV($csvData, 'couriers_' . date('Y-m-d') . '.csv', $headers);
+}
+
+include '../includes/footer.php';
+?>

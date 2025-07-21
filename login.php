@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'config/config.php';
+require_once 'config/database.php';
 require_once 'includes/auth.php';
 
 // Redirect if already logged in
@@ -92,15 +93,19 @@ $pageTitle = 'Login';
 
                             <button type="submit" class="btn btn-primary w-100">Sign In</button>
                         </form>
+                        
+                        <div class="text-center mt-3">
+                            <p class="mb-0">Don't have an account? <a href="register.php">Register here</a></p>
+                        </div>
                     </div>
                 </div>
 
                 <div class="text-center mt-3">
                     <small class="text-muted">
                         Demo credentials:<br>
-                        Admin: admin@courierpro.com / admin123<br>
-                        Agent: agent@courierpro.com / agent123<br>
-                        Customer: customer@courierpro.com / customer123
+                        Admin: admin@courierpro.com / password123<br>
+                        Agent: agent@courierpro.com / password123<br>
+                        Customer: customer@courierpro.com / password123
                     </small>
                 </div>
             </div>

@@ -70,8 +70,8 @@ body {
 }
 
 .card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
 .card-header {
@@ -157,7 +157,7 @@ body {
 
 .table tbody tr:hover {
     background-color: #f8f9fa;
-    transform: scale(1.01);
+    transform: scale(1.005);
 }
 
 .table tbody td {
@@ -191,6 +191,10 @@ body {
 
 .badge.bg-info {
     background: linear-gradient(135deg, var(--info-color) 0%, #3182ce 100%) !important;
+}
+
+.badge.bg-secondary {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%) !important;
 }
 
 /* Statistics Cards */
@@ -375,4 +379,20 @@ body {
 .timeline-marker.completed {
     background: var(--primary-color);
     border-color: var(--primary-color);
+}
+
+/* Print Styles */
+@media print {
+    .sidebar, .navbar, .btn, .pagination {
+        display: none !important;
+    }
+    
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+    }
+    
+    body {
+        background: white !important;
+    }
 }
